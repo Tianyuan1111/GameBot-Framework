@@ -1,0 +1,5 @@
+Flask
+pandas
+scapy
+SQLAlchemy
+WMI
