@@ -1,0 +1,31 @@
+body {
+    background-color: #f8f9fa;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.navbar-brand {
+    font-weight: bold;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+
+.card-title {
+    color: #495057;
+    font-weight: 600;
+}
+
+.btn {
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}

@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1>实体数据</h1>
+        <p class="text-muted">植物、矿物等实体信息</p>
+    </div>
+</div>
+
+<!-- 显示模式控制 -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">显示模式设置</h5>
+                <form id="display-form" method="get" class="row g-3 align-items-center">
+                    <div class="col-auto">
+                        <label for="display_mode" class="form-label">显示模式:</label>
+                    </div>
+                    <div class="col-auto">
+                        <select name="display_mode" id="display_mode" class="form-select" onchange="this.form.submit()">
+                            <option value="all" {% if display_mode=='all' %}selected{% endif %}>显示所有实体和未知实体</option>
+                            <option value="mature" {% if display_mode=='mature' %}selected{% endif %}>显示N阶及以上成熟植物和矿物
+                            </option>
+                            <option value="ores_only" {% if display_mode=='ores_only' %}selected{% endif %}>只显示N阶矿物
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <label for="maturity_level" class="form-label">阶数 N:</label>
+                    </div>
+                    <div class="col-auto">
+                        <select name="maturity_level" id="maturity_level" class="form-select"
+                            onchange="this.form.submit()" {% if display_mode=='all' %}disabled{% endif %}>
+                            <option value="1" {% if maturity_level==1 %}selected{% endif %}>1阶</option>
+                            <option value="2" {% if maturity_level==2 %}selected{% endif %}>2阶</option>
+                            <option value="3" {% if maturity_level==3 %}selected{% endif %}>3阶</option>
+                            <option value="4" {% if maturity_level==4 %}selected{% endif %}>4阶</option>
+                            <option value="5" {% if maturity_level==5 %}selected{% endif %}>5阶</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary">应用</button>
+                    </div>
+                </form>
+                <div class="mt-2">
+                    <small class="text-muted">
+                        {% if display_mode == 'all' %}
+                        当前显示: 所有实体（包含未知实体）
+                        {% elif display_mode == 'mature' %}
+                        当前显示: {{ maturity_level }}阶及以上成熟植物和矿物（不显示未知实体）
+                        {% elif display_mode == 'ores_only' %}
+                        当前显示: 仅{{ maturity_level }}阶及以上矿物
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 实体分布图 - 正方形设计 -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">实体分布图</h5>
+                <div class="square-chart-container">
+                    <div id="entity-scatter-chart" style="width: 100%; position: relative;">
+                        {% if not data %}
+                        <div class="text-center text-muted py-5">
+                            <i class="fas fa-map-marker-alt fa-3x mb-3"></i>
+                            <p>暂无数据</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 其余部分保持不变 -->
+<!-- 统计卡片 -->
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <h5 class="card-title">总实体数</h5>
+                <h2 class="card-text">{{ data|length }}</h2>
+            </div>
+        </div>
+    </div>
+    <!-- 其余卡片代码保持不变 -->
+</div>
+
+<!-- 其余HTML代码保持不变 -->
+{% endblock %}
+
+{% block styles %}
+<style>
+    .square-chart-container {
+        position: relative;
+        width: 100%;
+        padding-bottom: 100%;
+        /* 1:1 宽高比 */
+        height: 0;
+        overflow: hidden;
+    }
+
+    .square-chart-container #entity-scatter-chart {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 绘制实体分布散点图 - 优化版
+    const entityData = JSON.parse('{{ data | tojson | safe }}');
+    const currentDisplayMode = '{{ display_mode }}';
+    const currentMaturityLevel = parseInt('{{ maturity_level }}') || 1;
+
+    if (entityData && entityData.length > 0) {
+        const plantData = entityData.filter(d => d.entity_type === 'plant');
+        const oreData = entityData.filter(d => d.entity_type === 'ore');
+        const otherData = entityData.filter(d => !['plant', 'ore'].includes(d.entity_type));
+
+        const traces = [];
+
+        if (plantData.length > 0) {
+            traces.push({
+                x: plantData.map(d => d.position_x),
+                y: plantData.map(d => d.position_y),
+                mode: 'markers',
+                name: '🌱 植物',
+                marker: {
+                    color: '#28a745',
+                    size: 10,
+                    opacity: 0.8,
+                    line: {
+                        color: '#155724',
+                        width: 1
+                    }
+                },
+                text: plantData.map(d => {
+                    // 直接使用 maturity_level 字段
+                    const maturity = d.maturity_level || 0;
+                    const isMature = d.is_mature ? '是' : '否';
+                    return `${d.entity_name}<br>坐标: (${d.position_x.toFixed(1)}, ${d.position_y.toFixed(1)})<br>阶数: ${maturity}阶<br>是否成熟: ${isMature}<br>生长阶段: ${d.growth_stage || '未知'}`;
+                }),
+                hovertemplate: '<b>%{text}</b><extra></extra>'
+            });
+        }
+
+        if (oreData.length > 0) {
+            traces.push({
+                x: oreData.map(d => d.position_x),
+                y: oreData.map(d => d.position_y),
+                mode: 'markers',
+                name: '⛏️ 矿物',
+                marker: {
+                    color: '#ffc107',
+                    size: 12,
+                    opacity: 0.8,
+                    line: {
+                        color: '#856404',
+                        width: 1
+                    }
+                },
+                text: oreData.map(d => {
+                    // 计算矿物阶数
+                    const maturity = d.maturity_level || 0;
+                    return `${d.entity_name}<br>坐标: (${d.position_x.toFixed(1)}, ${d.position_y.toFixed(1)})<br>阶数: ${maturity}阶`;
+                }),
+                hovertemplate: '<b>%{text}</b><extra></extra>'
+            });
+        }
+
+        if (otherData.length > 0 && currentDisplayMode === 'all') {
+            traces.push({
+                x: otherData.map(d => d.position_x),
+                y: otherData.map(d => d.position_y),
+                mode: 'markers',
+                name: '❓ 其他',
+                marker: {
+                    color: '#6c757d',
+                    size: 8,
+                    opacity: 0.7,
+                    line: {
+                        color: '#495057',
+                        width: 1
+                    }
+                },
+                text: otherData.map(d => {
+                    const maturity = d.maturity_level || 0;
+                    return `${d.entity_name}<br>坐标: (${d.position_x.toFixed(1)}, ${d.position_y.toFixed(1)})<br>阶数: ${maturity}阶`;
+                }),
+                hovertemplate: '<b>%{text}</b><extra></extra>'
+            });
+        }
+
+        const scatterLayout = {
+            title: {
+                text: getChartTitle(currentDisplayMode, currentMaturityLevel),
+                font: {
+                    size: 16,
+                    family: 'Arial, sans-serif'
+                },
+                x: 0.5,
+                xanchor: 'center'
+            },
+            xaxis: {
+                title: {
+                    text: 'X坐标',
+                    font: { size: 12 }
+                },
+                gridcolor: '#e9ecef',
+                zerolinecolor: '#dee2e6',
+                showgrid: true,
+                scaleanchor: 'y', // 保持x轴和y轴比例一致
+                scaleratio: 1     // 确保正方形
+            },
+            yaxis: {
+                title: {
+                    text: 'Y坐标',
+                    font: { size: 12 }
+                },
+                gridcolor: '#e9ecef',
+                zerolinecolor: '#dee2e6',
+                showgrid: true
+            },
+            autosize: true,
+            plot_bgcolor: 'rgba(248,249,250,1)',
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            margin: { t: 60, b: 60, l: 60, r: 40 },
+            legend: {
+                orientation: 'h',
+                y: -0.15,
+                x: 0.5,
+                xanchor: 'center'
+            },
+            hovermode: 'closest',
+            showlegend: traces.length > 1
+        };
+
+        // 获取图表容器
+        const chartContainer = document.getElementById('entity-scatter-chart');
+
+        // 设置正方形尺寸
+        const containerWidth = chartContainer.offsetWidth;
+        chartContainer.style.height = containerWidth + 'px';
+
+        Plotly.newPlot('entity-scatter-chart', traces, scatterLayout, {
+            responsive: true,
+            displayModeBar: true,
+            displaylogo: false,
+            modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+        });
+
+        // 窗口大小改变时重新调整图表大小
+        window.addEventListener('resize', function () {
+            const chartContainer = document.getElementById('entity-scatter-chart');
+            const containerWidth = chartContainer.offsetWidth;
+            chartContainer.style.height = containerWidth + 'px';
+            Plotly.Plots.resize('entity-scatter-chart');
+        });
+    } else {
+        // 如果没有数据，隐藏图表容器
+        document.getElementById('entity-scatter-chart').style.display = 'none';
+    }
+
+    // 根据显示模式生成图表标题
+    function getChartTitle(displayMode, maturityLevel) {
+        const titles = {
+            'all': '所有实体分布图',
+            'mature': `${maturityLevel}阶及以上成熟植物和矿物分布`,
+            'ores_only': `${maturityLevel}阶及以上矿物分布`
+        };
+        return titles[displayMode] || '实体分布图';
+    }
+
+    // 绘制实体统计饼图
+    const stats = JSON.parse('{{ stats | tojson | safe}}');
+
+    if (stats && Object.keys(stats).length > 0) {
+        const colors = {
+            'plant': '#28a745',
+            'ore': '#ffc107',
+            'unknown': '#6c757d'
+        };
+
+        const pieData = [{
+            values: Object.values(stats),
+            labels: Object.keys(stats).map(key => {
+                const labels = {
+                    'plant': '🌱 植物',
+                    'ore': '⛏️ 矿物',
+                    'unknown': '❓ 未知'
+                };
+                return labels[key] || key;
+            }),
+            type: 'pie',
+            hole: 0.4,
+            marker: {
+                colors: Object.keys(stats).map(key => colors[key] || '#17a2b8')
+            },
+            textinfo: 'label+percent',
+            hoverinfo: 'label+value+percent',
+            textposition: 'inside',
+            insidetextorientation: 'radial'
+        }];
+
+        const pieLayout = {
+            title: {
+                text: '实体类型分布',
+                font: { size: 14 }
+            },
+            height: 300,
+            showlegend: false,
+            margin: { t: 40, b: 20, l: 20, r: 20 },
+            paper_bgcolor: 'rgba(0,0,0,0)'
+        };
+
+        Plotly.newPlot('entity-stats-chart', pieData, pieLayout);
+    } else {
+        // 如果没有数据，隐藏图表容器
+        document.getElementById('entity-stats-chart').style.display = 'none';
+    }
+
+    // 根据显示模式启用/禁用阶数选择器
+    document.getElementById('display_mode').addEventListener('change', function () {
+        const maturitySelect = document.getElementById('maturity_level');
+        if (this.value === 'all') {
+            maturitySelect.disabled = true;
+        } else {
+            maturitySelect.disabled = false;
+        }
+    });
+</script>
+{% endblock %}

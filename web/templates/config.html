@@ -1,0 +1,522 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1>系统配置</h1>
+        <p class="text-muted">修改系统运行参数和过滤条件</p>
+    </div>
+</div>
+
+<!-- 消息提示 -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+{% for category, message in messages %}
+<div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endfor %}
+{% endif %}
+{% endwith %}
+
+<div class="row mt-4">
+    <!-- 系统配置 -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">网络配置</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="config-form">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="server_ip" class="form-label">游戏服务器IP</label>
+                            <input type="text" class="form-control" id="server_ip" name="server_ip"
+                                value="{{ config.SERVER_IP }}" required>
+                            <div class="form-text">目标游戏服务器的IP地址</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="interface" class="form-label">网卡接口</label>
+                            <input type="text" class="form-control" id="interface" name="interface"
+                                value="{{ config.INTERFACE }}" required>
+                            <div class="form-text">用于数据包捕获的网络接口</div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="enable_port_filter"
+                                    name="enable_port_filter" value="true" {{ 'checked' if config.ENABLE_PORT_FILTER
+                                    else '' }}>
+                                <label class="form-check-label" for="enable_port_filter">
+                                    启用端口过滤
+                                </label>
+                            </div>
+                            <div class="form-text">是否启用客户端端口过滤</div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="enable_lengths_filter"
+                                    name="enable_lengths_filter" value="true" {{ 'checked' if
+                                    config.ENABLE_LENGTHS_FILTER else '' }}>
+                                <label class="form-check-label" for="enable_lengths_filter">
+                                    启用包长度过滤
+                                </label>
+                            </div>
+                            <div class="form-text">是否启用数据包长度过滤</div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="client_ports" class="form-label">客户端端口</label>
+                            <input type="text" class="form-control" id="client_ports" name="client_ports"
+                                value="{{ config.CLIENT_PORTS | join(',') }}">
+                            <div class="form-text">目标端口列表，用逗号分隔（如：1001,1002,1003）</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="packet_lengths" class="form-label">包长度过滤</label>
+                            <input type="text" class="form-control" id="packet_lengths" name="packet_lengths"
+                                value="{{ config.PACKET_LENGTHS | join(',') }}">
+                            <div class="form-text">允许的包长度列表，用逗号分隔（如：100,200,300）</div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="enable_map_scan"
+                                    name="enable_map_scan" value="true" {{ 'checked' if config.ENABLE_MAP_SCAN else ''
+                                    }}>
+                                <label class="form-check-label" for="enable_map_scan">
+                                    启用地图扫描
+                                </label>
+                            </div>
+                            <div class="form-text">是否启用自动地图扫描功能</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="scan_map_id" class="form-label">扫描地图ID</label>
+                            <select class="form-select" id="scan_map_id" name="scan_map_id">
+                                <option value="">请选择地图</option>
+                                {% for map_id, map_data in map_config.maps.items() %}
+                                <option value="{{ map_id }}" {{ 'selected' if config.SCAN_MAP_ID==map_id else '' }}>
+                                    {{ map_id }} - {{ map_data.map_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">默认扫描的地图编号</div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label for="initial_x" class="form-label">初始X坐标</label>
+                            <input type="number" class="form-control" id="initial_x" name="initial_x"
+                                value="{{ config.INITIAL_X }}">
+                            <div class="form-text">地图扫描起始X坐标</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="initial_y" class="form-label">初始Y坐标</label>
+                            <input type="number" class="form-control" id="initial_y" name="initial_y"
+                                value="{{ config.INITIAL_Y }}">
+                            <div class="form-text">地图扫描起始Y坐标</div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>保存配置
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
+                                <i class="fas fa-undo me-2"></i>重置
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 地图配置 -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">地图配置管理</h5>
+                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#mapModal">
+                    <i class="fas fa-plus me-1"></i>新建地图
+                </button>
+            </div>
+            <div class="card-body">
+                {% if map_config.maps %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>地图ID</th>
+                                <th>地图名称</th>
+                                <th>宽度</th>
+                                <th>高度</th>
+                                <th>默认</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for map_id, map_data in map_config.maps.items() %}
+                            <tr>
+                                <td><strong>{{ map_id }}</strong></td>
+                                <td>{{ map_data.map_name }}</td>
+                                <td>{{ map_data.map_width }}</td>
+                                <td>{{ map_data.map_height }}</td>
+                                <td>
+                                    {% if map_config.default_map == map_id %}
+                                    <span class="badge bg-success">是</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">否</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn-outline-primary btn-sm edit-map-btn"
+                                        data-map-id="{{ map_id }}" data-map-name="{{ map_data.map_name }}"
+                                        data-map-width="{{ map_data.map_width }}"
+                                        data-map-height="{{ map_data.map_height }}" title="编辑">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-success btn-sm set-default-btn"
+                                        data-map-id="{{ map_id }}" data-map-name="{{ map_data.map_name }}" title="设为默认">
+                                        <i class="fas fa-star"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm delete-map-btn"
+                                        data-map-id="{{ map_id }}" data-map-name="{{ map_data.map_name }}" title="删除">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-map fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">暂无地图配置</p>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#mapModal">
+                        <i class="fas fa-plus me-1"></i>创建第一个地图
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 地图编辑模态框 -->
+<div class="modal fade" id="mapModal" tabindex="-1" aria-labelledby="mapModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" id="map-form">
+                <input type="hidden" name="action" value="save_map_config">
+                <input type="hidden" name="map_id" id="map_id">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="mapModalLabel">地图配置</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="map_name" class="form-label">地图名称 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="map_name" name="map_name" required
+                            placeholder="请输入地图名称">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="map_width" class="form-label">地图宽度 <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="map_width" name="map_width" min="1" required
+                                placeholder="宽度">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="map_height" class="form-label">地图高度 <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="map_height" name="map_height" min="1" required
+                                placeholder="高度">
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <small class="text-muted">注：带 <span class="text-danger">*</span> 的字段为必填项</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 删除确认模态框 -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" id="delete-form">
+                <input type="hidden" name="action" value="delete_map">
+                <input type="hidden" name="map_id" id="delete_map_id">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteModalLabel">确认删除</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-3">
+                        <i class="fas fa-exclamation-triangle fa-3x text-warning"></i>
+                    </div>
+                    <p class="text-center">确定要删除地图 <strong id="delete_map_name" class="text-danger"></strong> 吗？</p>
+                    <p class="text-center text-muted small">此操作不可恢复，请谨慎操作！</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-danger">确认删除</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 表单重置功能
+    function resetForm() {
+        document.getElementById('config-form').reset();
+    }
+
+    // 实时显示端口和长度过滤状态
+    document.getElementById('enable_port_filter').addEventListener('change', function () {
+        document.getElementById('client_ports').disabled = !this.checked;
+    });
+
+    document.getElementById('enable_lengths_filter').addEventListener('change', function () {
+        document.getElementById('packet_lengths').disabled = !this.checked;
+    });
+
+    // 页面加载时设置初始状态
+    document.addEventListener('DOMContentLoaded', function () {
+        document.getElementById('client_ports').disabled = !document.getElementById('enable_port_filter').checked;
+        document.getElementById('packet_lengths').disabled = !document.getElementById('enable_lengths_filter').checked;
+
+        // 绑定编辑按钮事件
+        document.querySelectorAll('.edit-map-btn').forEach(button => {
+            button.addEventListener('click', function () {
+                const mapId = this.getAttribute('data-map-id');
+                const mapName = this.getAttribute('data-map-name');
+                const mapWidth = this.getAttribute('data-map-width');
+                const mapHeight = this.getAttribute('data-map-height');
+                editMap(mapId, mapName, mapWidth, mapHeight);
+            });
+        });
+
+        // 绑定删除按钮事件
+        document.querySelectorAll('.delete-map-btn').forEach(button => {
+            button.addEventListener('click', function () {
+                const mapId = this.getAttribute('data-map-id');
+                const mapName = this.getAttribute('data-map-name');
+                deleteMap(mapId, mapName);
+            });
+        });
+
+        // 绑定设置默认按钮事件
+        document.querySelectorAll('.set-default-btn').forEach(button => {
+            button.addEventListener('click', function () {
+                const mapId = this.getAttribute('data-map-id');
+                const mapName = this.getAttribute('data-map-name');
+                setDefaultMap(mapId, mapName);
+            });
+        });
+    });
+
+    // 地图编辑功能
+    function editMap(mapId, mapName, mapWidth, mapHeight) {
+        document.getElementById('map_id').value = mapId;
+        document.getElementById('map_name').value = mapName;
+        document.getElementById('map_width').value = mapWidth;
+        document.getElementById('map_height').value = mapHeight;
+        document.getElementById('mapModalLabel').textContent = '编辑地图 - ' + mapName;
+
+        var modal = new bootstrap.Modal(document.getElementById('mapModal'));
+        modal.show();
+    }
+
+    // 地图删除功能
+    function deleteMap(mapId, mapName) {
+        document.getElementById('delete_map_id').value = mapId;
+        document.getElementById('delete_map_name').textContent = mapName;
+
+        var modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+        modal.show();
+    }
+
+    // 设置默认地图功能
+    function setDefaultMap(mapId, mapName) {
+        if (confirm(`确定要将 "${mapName}" 设置为默认地图吗？`)) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '';
+
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = 'set_default_map';
+            form.appendChild(actionInput);
+
+            const mapIdInput = document.createElement('input');
+            mapIdInput.type = 'hidden';
+            mapIdInput.name = 'map_id';
+            mapIdInput.value = mapId;
+            form.appendChild(mapIdInput);
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+
+    // 新建地图时重置表单
+    document.getElementById('mapModal').addEventListener('show.bs.modal', function (event) {
+        if (!event.relatedTarget) { // 新建按钮触发
+            document.getElementById('map_id').value = '';
+            document.getElementById('map_name').value = '';
+            document.getElementById('map_width').value = '';
+            document.getElementById('map_height').value = '';
+            document.getElementById('mapModalLabel').textContent = '新建地图';
+        }
+    });
+
+    // 表单提交验证
+    document.getElementById('map-form').addEventListener('submit', function (e) {
+        const mapName = document.getElementById('map_name').value.trim();
+        const mapWidth = document.getElementById('map_width').value;
+        const mapHeight = document.getElementById('map_height').value;
+
+        if (!mapName) {
+            e.preventDefault();
+            alert('请输入地图名称！');
+            document.getElementById('map_name').focus();
+            return;
+        }
+
+        if (!mapWidth || mapWidth < 1) {
+            e.preventDefault();
+            alert('请输入有效的地图宽度！');
+            document.getElementById('map_width').focus();
+            return;
+        }
+
+        if (!mapHeight || mapHeight < 1) {
+            e.preventDefault();
+            alert('请输入有效的地图高度！');
+            document.getElementById('map_height').focus();
+            return;
+        }
+    });
+</script>
+
+<style>
+    .form-check-input:checked {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+    }
+
+    .card {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        border: 1px solid rgba(0, 0, 0, 0.125);
+    }
+
+    .card-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+        font-weight: 600;
+    }
+
+    .form-label {
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-text {
+        font-size: 0.875rem;
+    }
+
+    hr {
+        opacity: 0.3;
+    }
+
+    .table th {
+        border-top: none;
+        font-weight: 600;
+        background-color: #f8f9fa;
+    }
+
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+        margin: 0 2px;
+    }
+
+    .badge {
+        font-size: 0.75em;
+    }
+
+    .table-responsive {
+        border-radius: 0.375rem;
+    }
+
+    .table> :not(caption)>*>* {
+        padding: 0.75rem 0.5rem;
+    }
+
+    .text-danger {
+        color: #dc3545 !important;
+    }
+
+    .modal-header {
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .modal-footer {
+        border-top: 1px solid #dee2e6;
+    }
+
+    .form-control:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+
+    .btn-outline-primary:hover {
+        background-color: #0d6efd;
+        border-color: #0d6efd;
+        color: white;
+    }
+
+    .btn-outline-success:hover {
+        background-color: #198754;
+        border-color: #198754;
+        color: white;
+    }
+
+    .btn-outline-danger:hover {
+        background-color: #dc3545;
+        border-color: #dc3545;
+        color: white;
+    }
+
+    .edit-map-btn:hover,
+    .delete-map-btn:hover,
+    .set-default-btn:hover {
+        transform: translateY(-1px);
+        transition: all 0.2s ease;
+    }
+</style>
+{% endblock %}
