@@ -1,0 +1,720 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1>数据概览</h1>
+                <p class="text-muted">实体数据统计分析</p>
+            </div>
+            <button class="btn btn-outline-primary" onclick="showTargetConfig()">
+                <i class="fas fa-cog me-2"></i>管理目标ID
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h5 class="card-title">总实体数</h5>
+                <h2 id="total-entities">0</h2>
+                <p>已识别的实体总数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h5 class="card-title">未知实体</h5>
+                <h2 id="total-unknown-entities">0</h2>
+                <p>需要分析的实体</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h5 class="card-title">植物实体</h5>
+                <h2 id="total-plants">0</h2>
+                <p>植物类实体数量</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <h5 class="card-title">矿物实体</h5>
+                <h2 id="total-ores">0</h2>
+                <p>矿物类实体数量</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 散点图部分 -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">实体位置分布</h5>
+                <small class="text-muted">显示过滤后的植物和矿物分布</small>
+            </div>
+            <div class="card-body">
+                <div class="chart-container" style="position: relative; height: 400px;">
+                    <canvas id="scatter-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 表格部分 -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">实体数据表格</h5>
+                <small class="text-muted">共 <span id="total-records">0</span> 条记录（显示过滤后的植物和矿物数据）</small>
+            </div>
+            <div class="card-body">
+                <div id="entities-table-container">
+                    <div class="text-center py-5">
+                        <i class="fas fa-spinner fa-spin fa-2x text-muted mb-3"></i>
+                        <p class="text-muted">数据加载中...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 目标配置模态框 -->
+<div id="targetConfigModal" class="modal"
+    style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+    <div class="modal-content"
+        style="background-color: #fefefe; margin: 5% auto; padding: 0; border: 1px solid #888; width: 80%; max-width: 800px; border-radius: 8px;">
+        <div class="modal-header"
+            style="padding: 16px; border-bottom: 1px solid #dee2e6; background-color: #f8f9fa; border-radius: 8px 8px 0 0;">
+            <h5 style="margin: 0; font-weight: 600;">
+                <i class="fas fa-bullseye me-2"></i>目标ID配置管理
+            </h5>
+            <span class="close" onclick="closeTargetConfig()"
+                style="float: right; font-size: 24px; font-weight: bold; cursor: pointer; color: #6c757d;">&times;</span>
+        </div>
+        <div class="modal-body" style="padding: 20px;">
+            <div class="row">
+                <!-- 植物分类配置 -->
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header bg-success text-white">
+                            <h6 class="mb-0">
+                                <i class="fas fa-seedling me-2"></i>植物分类
+                                <span class="badge bg-light text-dark ms-2" id="plant-categories-count">0</span>
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex mb-3">
+                                <input type="text" class="form-control form-control-sm" id="new-plant-category"
+                                    placeholder="输入新的植物分类ID">
+                                <button class="btn btn-success btn-sm ms-2" onclick="addPlantCategory()">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                            <div id="plant-categories-list" class="category-list"
+                                style="max-height: 300px; overflow-y: auto;">
+                                <!-- 植物分类列表将在这里动态生成 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 矿物分类配置 -->
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header bg-warning text-dark">
+                            <h6 class="mb-0">
+                                <i class="fas fa-mountain me-2"></i>矿物分类
+                                <span class="badge bg-light text-dark ms-2" id="ore-categories-count">0</span>
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex mb-3">
+                                <input type="text" class="form-control form-control-sm" id="new-ore-category"
+                                    placeholder="输入新的矿物分类ID">
+                                <button class="btn btn-warning btn-sm ms-2" onclick="addOreCategory()">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                            <div id="ore-categories-list" class="category-list"
+                                style="max-height: 300px; overflow-y: auto;">
+                                <!-- 矿物分类列表将在这里动态生成 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 配置说明 -->
+            <div class="alert alert-info mt-3" style="font-size: 0.875rem;">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>说明：</strong>配置的目标ID将用于筛选显示的植物和矿物数据。添加新的ID后，系统将自动包含该分类的实体数据。
+            </div>
+        </div>
+        <div class="modal-footer"
+            style="padding: 16px; border-top: 1px solid #dee2e6; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
+            <button type="button" class="btn btn-secondary" onclick="closeTargetConfig()">取消</button>
+            <button type="button" class="btn btn-primary" onclick="saveTargetConfig()">
+                <i class="fas fa-save me-2"></i>保存配置
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // 散点图实例
+    let scatterChart = null;
+
+    // 目标分类配置数据
+    let targetConfig = {
+        plant_categories: [],
+        ore_categories: []
+    };
+
+    // 初始化散点图
+    function initScatterChart() {
+        const ctx = document.getElementById('scatter-chart').getContext('2d');
+
+        scatterChart = new Chart(ctx, {
+            type: 'scatter',
+            data: {
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'X 坐标'
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Y 坐标'
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            boxWidth: 12,
+                            font: {
+                                size: 11
+                            },
+                            padding: 15
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                const point = context.raw;
+                                return `${point.entityName}: (${point.x.toFixed(1)}, ${point.y.toFixed(1)})`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // 更新散点图数据
+    function updateScatterChart(plantsData, oresData) {
+        if (!scatterChart) return;
+
+        const datasets = [];
+
+        // 添加植物数据
+        if (plantsData && Object.keys(plantsData).length > 0) {
+            const plantPoints = [];
+            Object.entries(plantsData).forEach(([name, locations]) => {
+                locations.forEach(location => {
+                    plantPoints.push({
+                        x: location.x,
+                        y: location.y,
+                        entityName: name
+                    });
+                });
+            });
+
+            if (plantPoints.length > 0) {
+                datasets.push({
+                    label: '植物',
+                    data: plantPoints,
+                    backgroundColor: 'rgba(40, 167, 69, 0.7)',
+                    borderColor: 'rgba(40, 167, 69, 1)',
+                    borderWidth: 1,
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                });
+            }
+        }
+
+        // 添加矿物数据
+        if (oresData && Object.keys(oresData).length > 0) {
+            const orePoints = [];
+            Object.entries(oresData).forEach(([name, locations]) => {
+                locations.forEach(location => {
+                    orePoints.push({
+                        x: location.x,
+                        y: location.y,
+                        entityName: name
+                    });
+                });
+            });
+
+            if (orePoints.length > 0) {
+                datasets.push({
+                    label: '矿物',
+                    data: orePoints,
+                    backgroundColor: 'rgba(255, 193, 7, 0.7)',
+                    borderColor: 'rgba(255, 193, 7, 1)',
+                    borderWidth: 1,
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                });
+            }
+        }
+
+        scatterChart.data.datasets = datasets;
+        scatterChart.update();
+    }
+
+    // 更新统计数据
+    function updateStats() {
+        fetch('/api/stats')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('网络响应不正常');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('获取到的统计数据:', data);
+
+                // 更新基础统计
+                document.getElementById('total-entities').textContent =
+                    data.summary?.total_entities?.toLocaleString() || '0';
+                document.getElementById('total-unknown-entities').textContent =
+                    data.summary?.total_unknown_entities?.toLocaleString() || '0';
+                document.getElementById('total-plants').textContent =
+                    data.summary?.total_plants?.toLocaleString() || '0';
+                document.getElementById('total-ores').textContent =
+                    data.summary?.total_ores?.toLocaleString() || '0';
+
+                // 更新散点图
+                updateScatterChart(data.plants_locations, data.ores_locations);
+
+                // 更新表格数据
+                updateEntitiesTable(data.entities_data || []);
+            })
+            .catch(error => {
+                console.error('获取统计数据失败:', error);
+                document.getElementById('entities-table-container').innerHTML =
+                    '<div class="text-center py-5 text-danger">数据加载失败</div>';
+            });
+    }
+
+    // 更新实体表格
+    function updateEntitiesTable(entities) {
+        const container = document.getElementById('entities-table-container');
+        const totalRecords = document.getElementById('total-records');
+
+        totalRecords.textContent = entities.length.toLocaleString();
+
+        if (entities.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="fas fa-database fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">暂无实体数据</p>
+                </div>
+            `;
+            return;
+        }
+
+        let tableHtml = `
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>实体ID</th>
+                            <th>类型</th>
+                            <th>名称</th>
+                            <th>分类</th>
+                            <th>生长阶段</th>
+                            <th>坐标</th>
+                            <th>索引</th>
+                            <th>时间</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        entities.forEach(item => {
+            const entityTypeBadge = getEntityTypeBadge(item.entity_type);
+            const growthStage = getGrowthStageDisplay(item.growth_stage);
+            const timestamp = item.timestamp ? item.timestamp.substring(0, 16).replace('T', ' ') : '-';
+
+            tableHtml += `
+                <tr>
+                    <td><small class="text-muted">${item.id}</small></td>
+                    <td><code>${item.entity_id}</code></td>
+                    <td>${entityTypeBadge}</td>
+                    <td>
+                        <strong>${item.entity_name}</strong>
+                        ${item.is_unknown ? '<span class="badge bg-danger ms-1" title="未知实体">?</span>' : ''}
+                    </td>
+                    <td>
+                        ${item.category ? `<span class="badge bg-light text-dark">${item.category}</span>` : '<span class="text-muted">-</span>'}
+                    </td>
+                    <td>${growthStage}</td>
+                    <td>
+                        <small>(${item.position_x.toFixed(1)}, ${item.position_y.toFixed(1)})</small>
+                    </td>
+                    <td>
+                        ${item.entity_index ? `<code class="small">${item.entity_index.substring(0, 8)}...</code>` : '<span class="text-muted">-</span>'}
+                    </td>
+                    <td>
+                        <small>${timestamp}</small>
+                    </td>
+                    <td>
+                        ${item.is_unknown ? '<span class="badge bg-danger">未知</span>' : '<span class="badge bg-success">已知</span>'}
+                    </td>
+                </tr>
+            `;
+        });
+
+        tableHtml += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        container.innerHTML = tableHtml;
+    }
+
+    // 获取实体类型徽章
+    function getEntityTypeBadge(entityType) {
+        const badges = {
+            'plant': '<span class="badge bg-success">🌱 植物</span>',
+            'ore': '<span class="badge bg-warning">⛏️ 矿物</span>',
+            'unknown': '<span class="badge bg-secondary">❓ 未知</span>'
+        };
+        return badges[entityType] || `<span class="badge bg-info">${entityType}</span>`;
+    }
+
+    // 获取生长阶段显示
+    function getGrowthStageDisplay(growthStage) {
+        if (growthStage === null || growthStage === undefined) {
+            return '<span class="text-muted">-</span>';
+        }
+        return `
+            <div class="progress" style="height: 6px; width: 60px;" title="阶段 ${growthStage}">
+                <div class="progress-bar bg-success" style="width: ${(growthStage / 5) * 100}%"></div>
+            </div>
+            <small class="text-muted">${growthStage}</small>
+        `;
+    }
+
+    // 显示目标配置模态框
+    function showTargetConfig() {
+        loadTargetConfig();
+        document.getElementById('targetConfigModal').style.display = 'block';
+    }
+
+    // 关闭目标配置模态框
+    function closeTargetConfig() {
+        document.getElementById('targetConfigModal').style.display = 'none';
+    }
+
+    // 点击模态框外部关闭
+    window.onclick = function (event) {
+        const modal = document.getElementById('targetConfigModal');
+        if (event.target === modal) {
+            closeTargetConfig();
+        }
+    }
+
+    // 加载目标配置
+    function loadTargetConfig() {
+        fetch('/api/target-categories')
+            .then(response => response.json())
+            .then(data => {
+                targetConfig = data;
+                updateCategoriesDisplay();
+            })
+            .catch(error => {
+                console.error('加载目标配置失败:', error);
+                showAlert('加载配置失败', 'danger');
+            });
+    }
+
+    // 更新分类显示
+    function updateCategoriesDisplay() {
+        // 更新植物分类
+        const plantList = document.getElementById('plant-categories-list');
+        plantList.innerHTML = targetConfig.plant_categories.map(category => `
+            <div class="category-item d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                <span class="category-id" style="font-family: 'Courier New', monospace; font-weight: bold;">${category}</span>
+                <button class="btn btn-outline-danger btn-sm" onclick="removeCategory('plant', '${category}')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `).join('');
+
+        // 更新矿物分类
+        const oreList = document.getElementById('ore-categories-list');
+        oreList.innerHTML = targetConfig.ore_categories.map(category => `
+            <div class="category-item d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                <span class="category-id" style="font-family: 'Courier New', monospace; font-weight: bold;">${category}</span>
+                <button class="btn btn-outline-danger btn-sm" onclick="removeCategory('ore', '${category}')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `).join('');
+
+        // 更新计数
+        document.getElementById('plant-categories-count').textContent = targetConfig.plant_categories.length;
+        document.getElementById('ore-categories-count').textContent = targetConfig.ore_categories.length;
+    }
+
+    // 添加植物分类
+    function addPlantCategory() {
+        const input = document.getElementById('new-plant-category');
+        const newCategory = input.value.trim();
+
+        if (!newCategory) {
+            showAlert('请输入分类ID', 'warning');
+            return;
+        }
+
+        if (targetConfig.plant_categories.includes(newCategory)) {
+            showAlert('该分类已存在', 'warning');
+            return;
+        }
+
+        targetConfig.plant_categories.push(newCategory);
+        input.value = '';
+        updateCategoriesDisplay();
+        showAlert('植物分类已添加', 'success');
+    }
+
+    // 添加矿物分类
+    function addOreCategory() {
+        const input = document.getElementById('new-ore-category');
+        const newCategory = input.value.trim();
+
+        if (!newCategory) {
+            showAlert('请输入分类ID', 'warning');
+            return;
+        }
+
+        if (targetConfig.ore_categories.includes(newCategory)) {
+            showAlert('该分类已存在', 'warning');
+            return;
+        }
+
+        targetConfig.ore_categories.push(newCategory);
+        input.value = '';
+        updateCategoriesDisplay();
+        showAlert('矿物分类已添加', 'success');
+    }
+
+    // 删除分类
+    function removeCategory(type, categoryId) {
+        if (!confirm(`确定要删除${type === 'plant' ? '植物' : '矿物'}分类 "${categoryId}" 吗？`)) {
+            return;
+        }
+
+        fetch('/api/target-categories', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                type: type,
+                id: categoryId
+            })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showAlert(data.error, 'danger');
+                } else {
+                    // 从本地配置中移除
+                    if (type === 'plant') {
+                        targetConfig.plant_categories = targetConfig.plant_categories.filter(id => id !== categoryId);
+                    } else {
+                        targetConfig.ore_categories = targetConfig.ore_categories.filter(id => id !== categoryId);
+                    }
+                    updateCategoriesDisplay();
+                    showAlert('删除成功', 'success');
+
+                    // 重新加载统计数据
+                    setTimeout(updateStats, 500);
+                }
+            })
+            .catch(error => {
+                console.error('删除分类失败:', error);
+                showAlert('删除失败', 'danger');
+            });
+    }
+
+    // 保存配置
+    function saveTargetConfig() {
+        fetch('/api/target-categories', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(targetConfig)
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    showAlert(data.error, 'danger');
+                } else {
+                    showAlert('配置保存成功', 'success');
+                    closeTargetConfig();
+
+                    // 重新加载统计数据
+                    setTimeout(updateStats, 500);
+                }
+            })
+            .catch(error => {
+                console.error('保存配置失败:', error);
+                showAlert('保存失败', 'danger');
+            });
+    }
+
+    // 显示提示消息
+    function showAlert(message, type) {
+        // 移除现有的提示
+        const existingAlert = document.querySelector('.alert-toast');
+        if (existingAlert) {
+            existingAlert.remove();
+        }
+
+        // 创建新的提示
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type} alert-toast position-fixed`;
+        alert.style.cssText = 'top: 20px; right: 20px; z-index: 1100; min-width: 300px; box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);';
+        alert.innerHTML = `
+            <div class="d-flex">
+                <div class="flex-grow-1">${message}</div>
+                <button type="button" class="btn-close" onclick="this.parentElement.parentElement.remove()"></button>
+            </div>
+        `;
+
+        document.body.appendChild(alert);
+
+        // 3秒后自动移除
+        setTimeout(() => {
+            if (alert.parentElement) {
+                alert.remove();
+            }
+        }, 3000);
+    }
+
+    // 页面加载时初始化
+    document.addEventListener('DOMContentLoaded', function () {
+        initScatterChart();
+        updateStats();
+
+        // 为输入框添加回车键支持
+        document.getElementById('new-plant-category').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') addPlantCategory();
+        });
+
+        document.getElementById('new-ore-category').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') addOreCategory();
+        });
+
+        // 每30秒更新一次数据
+        setInterval(updateStats, 30000);
+    });
+</script>
+
+<style>
+    .table th {
+        border-top: none;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+
+    .table td {
+        vertical-align: middle;
+        font-size: 0.875rem;
+    }
+
+    .card {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        border: 1px solid rgba(0, 0, 0, 0.125);
+    }
+
+    .card-title {
+        font-weight: 600;
+    }
+
+    .progress {
+        margin-bottom: 2px;
+    }
+
+    .chart-container {
+        background: #f8f9fa;
+        border-radius: 5px;
+        padding: 15px;
+    }
+
+    .category-item {
+        background: #f8f9fa;
+        transition: background-color 0.2s;
+    }
+
+    .category-item:hover {
+        background: #e9ecef;
+    }
+
+    .modal-content {
+        animation: modalFadeIn 0.3s;
+    }
+
+    @keyframes modalFadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-50px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,45 @@
+{
+    "maps": {
+        "001": {
+            "map_name": "十万大山",
+            "map_width": 335,
+            "map_height": 285
+        },
+        "002": {
+            "map_name": "云梦泽",
+            "map_width": 285,
+            "map_height": 240
+        },
+        "003": {
+            "map_name": "极寒山脉",
+            "map_width": 335,
+            "map_height": 285
+        },
+        "004": {
+            "map_name": "昆吾圣山",
+            "map_width": 385,
+            "map_height": 385
+        },
+        "005": {
+            "map_name": "上古战场",
+            "map_width": 382,
+            "map_height": 383
+        },
+        "006": {
+            "map_name": "极西之地",
+            "map_width": 383,
+            "map_height": 383
+        },
+        "007": {
+            "map_name": "天都山脉",
+            "map_width": 285,
+            "map_height": 285
+        },
+        "008": {
+            "map_name": "北冥冰原",
+            "map_width": 238,
+            "map_height": 238
+        }
+    },
+    "default_map": "004"
+}

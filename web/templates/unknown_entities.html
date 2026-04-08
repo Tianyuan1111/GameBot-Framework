@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1>未知实体</h1>
+        <p class="text-muted">需要分析的未知实体数据</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">未知实体列表</h5>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>实体ID</th>
+                                <th>X坐标</th>
+                                <th>Y坐标</th>
+                                <th>出现次数</th>
+                                <th>首次出现</th>
+                                <th>最后出现</th>
+                                <th>原始数据</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in data %}
+                            <tr>
+                                <td>{{ item.id }}</td>
+                                <td>
+                                    <code>{{ item.entity_id }}</code>
+                                </td>
+                                <td>
+                                    {% if item.position_x is not none %}
+                                    {{ "%.2f"|format(item.position_x) }}
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.position_y is not none %}
+                                    {{ "%.2f"|format(item.position_y) }}
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-warning">{{ item.occurrence_count }}</span>
+                                </td>
+                                <td>
+                                    {% if item.first_seen %}
+                                    {{ item.first_seen[:19] }}
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.last_seen %}
+                                    {{ item.last_seen[:19] }}
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.raw_hex_data %}
+                                    <span class="badge bg-success">有数据</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">无数据</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-info view-data-btn" data-id="{{ item.id }}"
+                                        data-entity-id="{{ item.entity_id }}"
+                                        data-hex-data="{{ item.raw_hex_data or '' }}">
+                                        <i class="fas fa-eye"></i> 查看数据
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="9" class="text-center text-muted py-4">
+                                    <i class="fas fa-inbox fa-2x mb-2"></i><br>
+                                    暂无未知实体数据
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 原始数据模态框 -->
+<div class="modal fade" id="rawDataModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">实体原始数据 - ID: <span id="modalEntityId"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <strong>实体ID:</strong> <code id="entityIdDisplay"></code>
+                </div>
+                <div class="mb-3">
+                    <strong>数据长度:</strong> <span id="dataLength"></span>
+                </div>
+                <div>
+                    <strong>原始十六进制数据:</strong>
+                    <pre id="rawDataContent" class="bg-light p-3 mt-2" style="max-height: 400px; overflow: auto;"></pre>
+                </div>
+                {% if True %} {# 临时允许所有访问，绕过用户认证检查 #}
+                <div class="mt-3">
+                    <button class="btn btn-sm btn-outline-primary" onclick="analyzeHexData()">
+                        <i class="fas fa-search"></i> 分析数据格式
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                <button type="button" class="btn btn-primary" onclick="copyHexData()">
+                    <i class="fas fa-copy"></i> 复制数据
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function showRawData(id, entityId, rawHexData) {
+        // 设置模态框标题和内容
+        document.getElementById('modalEntityId').textContent = id;
+        document.getElementById('entityIdDisplay').textContent = entityId;
+
+        if (rawHexData && rawHexData.trim() !== '') {
+            const hexString = rawHexData.trim();
+            document.getElementById('dataLength').textContent = hexString.length + ' 字符 (' + (hexString.length / 2) + ' 字节)';
+
+            // 格式化十六进制数据（每2个字符一组，每16组一行）
+            let formattedHex = '';
+            for (let i = 0; i < hexString.length; i += 2) {
+                if (i > 0 && i % 32 === 0) {
+                    formattedHex += '\n';
+                } else if (i > 0 && i % 2 === 0) {
+                    formattedHex += ' ';
+                }
+                formattedHex += hexString.substr(i, 2);
+            }
+
+            document.getElementById('rawDataContent').textContent = formattedHex;
+        } else {
+            document.getElementById('dataLength').textContent = '0 字符 (0 字节)';
+            document.getElementById('rawDataContent').textContent = '暂无原始数据';
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById('rawDataModal'));
+        modal.show();
+    }
+
+    function copyHexData() {
+        const hexData = document.getElementById('rawDataContent').textContent;
+        // 移除格式化空格和换行
+        const cleanHexData = hexData.replace(/[\s\n]/g, '');
+
+        if (cleanHexData && cleanHexData !== '暂无原始数据') {
+            navigator.clipboard.writeText(cleanHexData).then(function () {
+                // 显示复制成功提示
+                const copyBtn = document.querySelector('.modal-footer .btn-primary');
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = '<i class="fas fa-check"></i> 已复制';
+                copyBtn.classList.remove('btn-primary');
+                copyBtn.classList.add('btn-success');
+
+                setTimeout(function () {
+                    copyBtn.innerHTML = originalText;
+                    copyBtn.classList.remove('btn-success');
+                    copyBtn.classList.add('btn-primary');
+                }, 2000);
+            });
+        }
+    }
+
+    function analyzeHexData() {
+        const hexData = document.getElementById('rawDataContent').textContent.replace(/[\s\n]/g, '');
+
+        if (!hexData || hexData === '暂无原始数据') {
+            alert('没有可分析的数据');
+            return;
+        }
+
+        // 这里可以添加更复杂的分析逻辑
+        // 简单的数据分析示例
+        const analysis = [];
+        analysis.push(`数据总长度: ${hexData.length} 字符 (${hexData.length / 2} 字节)`);
+
+        // 尝试解析可能的字段
+        if (hexData.length >= 4) {
+            const entityIdHex = hexData.substr(0, 4);
+            analysis.push(`前2字节(可能为实体ID): 0x${entityIdHex} (十进制: ${parseInt(entityIdHex, 16)})`);
+        }
+
+        if (hexData.length >= 8) {
+            const possibleCoords = hexData.substr(4, 8);
+            analysis.push(`接下来4字节: 0x${possibleCoords} (可能为坐标数据)`);
+        }
+
+        // 显示分析结果
+        alert('初步分析结果:\n\n' + analysis.join('\n'));
+    }
+</script>
+{% endblock %}

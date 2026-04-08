@@ -1,0 +1,482 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1>状态机控制</h1>
+        <p class="text-muted">实时监控和控制游戏状态机</p>
+    </div>
+</div>
+
+<!-- 消息提示 -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+{% for category, message in messages %}
+<div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endfor %}
+{% endif %}
+{% endwith %}
+
+<!-- 状态机控制卡片 -->
+<div class="row mt-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cogs me-2"></i>状态机控制面板
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- 当前状态显示 -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h6 class="card-title text-muted">当前状态</h6>
+                                <h3 id="current-state" class="text-primary">UNKNOWN</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h6 class="card-title text-muted">目标状态</h6>
+                                <h3 id="target-state" class="text-info">UNKNOWN</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 控制按钮 -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h6>状态控制</h6>
+                        <div class="btn-group-vertical w-100" role="group">
+                            {% for state in state_list %}
+                            <button type="button" class="btn btn-outline-primary state-btn"
+                                data-state="{{ state.value }}">
+                                {{ state.value }}
+                            </button>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 系统控制 -->
+                <div class="row">
+                    <div class="col-12">
+                        <h6>系统控制</h6>
+                        <div class="btn-group w-100" role="group">
+                            <button type="button" class="btn btn-success" id="resume-btn">
+                                <i class="fas fa-play me-2"></i>恢复
+                            </button>
+                            <button type="button" class="btn btn-warning" id="pause-btn">
+                                <i class="fas fa-pause me-2"></i>暂停
+                            </button>
+                            <button type="button" class="btn btn-danger" id="emergency-stop-btn">
+                                <i class="fas fa-stop-circle me-2"></i>紧急停止
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">系统状态</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        状态机运行
+                        <span id="system-running" class="badge bg-danger rounded-pill">
+                            停止
+                        </span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        暂停状态
+                        <span id="system-paused" class="badge bg-secondary rounded-pill">
+                            运行中
+                        </span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        初始化状态
+                        <span id="system-initialized" class="badge bg-danger rounded-pill">
+                            未初始化
+                        </span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        最后更新
+                        <span id="last-update" class="badge bg-light text-dark rounded-pill">
+                            --
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">快速操作</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-info" id="refresh-status-btn">
+                        <i class="fas fa-sync-alt me-2"></i>刷新状态
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="force-idle-btn">
+                        强制切换到空闲状态
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="force-scan-btn">
+                        强制切换到地图扫描
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 状态信息显示 -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">状态信息</h5>
+            </div>
+            <div class="card-body">
+                <div id="status-message" class="alert alert-info">
+                    正在连接状态机...
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <tbody>
+                            <tr>
+                                <th width="150">当前状态:</th>
+                                <td id="detail-current-state">--</td>
+                            </tr>
+                            <tr>
+                                <th>目标状态:</th>
+                                <td id="detail-target-state">--</td>
+                            </tr>
+                            <tr>
+                                <th>状态机状态:</th>
+                                <td id="detail-machine-status">--</td>
+                            </tr>
+                            <tr>
+                                <th>最后错误:</th>
+                                <td id="detail-last-error">无</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 页面元素引用
+    const currentStateElement = document.getElementById('current-state');
+    const targetStateElement = document.getElementById('target-state');
+    const stateButtons = document.querySelectorAll('.state-btn');
+    const statusMessageElement = document.getElementById('status-message');
+
+    // 完整的状态颜色映射
+    const stateColors = {
+        'IDLE': 'secondary',
+        'MAP_SCANNING': 'info',
+        'COMBAT': 'danger',
+        'MOVING': 'warning',
+        'ERROR': 'dark',
+        'RECOVERING': 'success',
+        'NOT_STARTED': 'danger',
+        'UNKNOWN': 'secondary'
+    };
+
+    // 设置状态按钮事件
+    stateButtons.forEach(button => {
+        button.addEventListener('click', function () {
+            const targetState = this.getAttribute('data-state');
+            setTargetState(targetState);
+        });
+    });
+
+    // 设置目标状态
+    function setTargetState(state) {
+        showAlert('正在设置目标状态...', 'info');
+
+        fetch('/state_machine/set_target_state', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ state: state })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert(`目标状态已设置为 ${state}`, 'success');
+                    updateStatus();
+                } else {
+                    showAlert('状态设置失败: ' + (data.message || '未知错误'), 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('网络错误: ' + error.message, 'danger');
+            });
+    }
+
+    // 系统控制按钮事件
+    document.getElementById('resume-btn').addEventListener('click', function () {
+        fetch('/state_machine/resume', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('状态机已恢复运行', 'success');
+                    updateStatus();
+                } else {
+                    showAlert('恢复失败: ' + (data.message || '未知错误'), 'danger');
+                }
+            })
+            .catch(error => {
+                showAlert('网络错误: ' + error.message, 'danger');
+            });
+    });
+
+    document.getElementById('pause-btn').addEventListener('click', function () {
+        fetch('/state_machine/pause', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert('状态机已暂停', 'warning');
+                    updateStatus();
+                } else {
+                    showAlert('暂停失败: ' + (data.message || '未知错误'), 'danger');
+                }
+            })
+            .catch(error => {
+                showAlert('网络错误: ' + error.message, 'danger');
+            });
+    });
+
+    document.getElementById('emergency-stop-btn').addEventListener('click', function () {
+        if (confirm('确定要紧急停止状态机吗？此操作将立即停止所有活动！')) {
+            fetch('/state_machine/emergency_stop', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('状态机已紧急停止', 'danger');
+                        updateStatus();
+                    } else {
+                        showAlert('紧急停止失败: ' + (data.message || '未知错误'), 'danger');
+                    }
+                })
+                .catch(error => {
+                    showAlert('网络错误: ' + error.message, 'danger');
+                });
+        }
+    });
+
+    // 快速操作按钮
+    document.getElementById('refresh-status-btn').addEventListener('click', updateStatus);
+    document.getElementById('force-idle-btn').addEventListener('click', () => forceStateChange('IDLE'));
+    document.getElementById('force-scan-btn').addEventListener('click', () => forceStateChange('MAP_SCANNING'));
+
+    // 强制状态切换
+    function forceStateChange(state) {
+        if (confirm(`确定要强制切换到 ${state} 状态吗？这可能会跳过正常的状态转移条件！`)) {
+            fetch('/state_machine/force_state_change', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ state: state })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert(`已强制切换到 ${state} 状态`, 'info');
+                        updateStatus();
+                    } else {
+                        showAlert('强制状态切换失败: ' + (data.message || '未知错误'), 'danger');
+                    }
+                })
+                .catch(error => {
+                    showAlert('网络错误: ' + error.message, 'danger');
+                });
+        }
+    }
+
+    // 更新状态显示
+    function updateStatus() {
+        fetch('/state_machine/status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateStatusDisplay(data.status);
+                    statusMessageElement.className = 'alert alert-success';
+                    statusMessageElement.textContent = '状态机连接正常';
+                } else {
+                    statusMessageElement.className = 'alert alert-warning';
+                    statusMessageElement.textContent = '状态机未就绪: ' + (data.message || '未知错误');
+                    resetStatusDisplay();
+                }
+            })
+            .catch(error => {
+                console.error('状态更新失败:', error);
+                statusMessageElement.className = 'alert alert-danger';
+                statusMessageElement.textContent = '连接状态机失败: ' + error.message;
+                resetStatusDisplay();
+            });
+    }
+
+    // 更新状态显示
+    function updateStatusDisplay(status) {
+        if (!status) {
+            resetStatusDisplay();
+            return;
+        }
+
+        const currentState = status.current_state || 'UNKNOWN';
+        const targetState = status.target_state || 'UNKNOWN';
+
+        // 处理状态值（可能是对象或字符串）
+        const currentStateValue = typeof currentState === 'object' ? currentState.value : currentState;
+        const targetStateValue = typeof targetState === 'object' ? targetState.value : targetState;
+
+        // 更新状态显示
+        currentStateElement.textContent = currentStateValue;
+        targetStateElement.textContent = targetStateValue;
+
+        // 更新详细状态信息
+        document.getElementById('detail-current-state').textContent = currentStateValue;
+        document.getElementById('detail-target-state').textContent = targetStateValue;
+        document.getElementById('detail-machine-status').textContent = status.running ? '运行中' : '停止';
+        document.getElementById('detail-last-error').textContent = status.last_error || '无';
+
+        // 更新状态颜色
+        const currentStateColor = stateColors[currentStateValue] || 'secondary';
+        const targetStateColor = stateColors[targetStateValue] || 'secondary';
+
+        currentStateElement.className = `text-${currentStateColor}`;
+        targetStateElement.className = `text-${targetStateColor}`;
+
+        // 更新系统状态
+        document.getElementById('system-running').className = `badge bg-${status.running ? 'success' : 'danger'} rounded-pill`;
+        document.getElementById('system-running').textContent = status.running ? '运行中' : '停止';
+
+        document.getElementById('system-paused').className = `badge bg-${status.paused ? 'warning' : 'secondary'} rounded-pill`;
+        document.getElementById('system-paused').textContent = status.paused ? '已暂停' : '运行中';
+
+        document.getElementById('system-initialized').className = `badge bg-${status.running ? 'success' : 'danger'} rounded-pill`;
+        document.getElementById('system-initialized').textContent = status.running ? '已初始化' : '未初始化';
+
+        // 更新时间戳
+        document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+    }
+
+    // 重置状态显示
+    function resetStatusDisplay() {
+        currentStateElement.textContent = 'UNKNOWN';
+        targetStateElement.textContent = 'UNKNOWN';
+        currentStateElement.className = 'text-secondary';
+        targetStateElement.className = 'text-secondary';
+
+        document.getElementById('system-running').className = 'badge bg-danger rounded-pill';
+        document.getElementById('system-running').textContent = '停止';
+
+        document.getElementById('system-paused').className = 'badge bg-secondary rounded-pill';
+        document.getElementById('system-paused').textContent = '运行中';
+
+        document.getElementById('system-initialized').className = 'badge bg-danger rounded-pill';
+        document.getElementById('system-initialized').textContent = '未初始化';
+
+        document.getElementById('last-update').textContent = '--';
+    }
+
+    // 显示提示消息
+    function showAlert(message, type) {
+        // 移除现有的提示
+        const existingAlerts = document.querySelectorAll('.alert-dismissible:not(#status-message)');
+        existingAlerts.forEach(alert => alert.remove());
+
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+
+        // 插入到消息区域
+        const contentElement = document.querySelector('.row:first-child');
+        contentElement.parentNode.insertBefore(alertDiv, contentElement.nextSibling);
+
+        // 5秒后自动消失
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+
+    // 定时更新状态（每3秒）
+    setInterval(updateStatus, 3000);
+
+    // 页面加载时初始化
+    document.addEventListener('DOMContentLoaded', function () {
+        updateStatus();
+    });
+</script>
+
+<style>
+    .state-btn {
+        text-align: left;
+        margin-bottom: 0.25rem;
+        transition: all 0.2s ease;
+    }
+
+    .state-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .card {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        border: 1px solid rgba(0, 0, 0, 0.125);
+        transition: box-shadow 0.2s ease;
+    }
+
+    .card:hover {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    }
+
+    .card-header {
+        font-weight: 600;
+    }
+
+    .list-group-item {
+        border: none;
+        padding: 0.75rem 0;
+    }
+
+    .badge {
+        font-size: 0.75em;
+    }
+
+    .table th {
+        border-top: none;
+        font-weight: 600;
+        color: #6c757d;
+        background-color: #f8f9fa;
+    }
+</style>
+{% endblock %}
