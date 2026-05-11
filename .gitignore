@@ -1,2 +1,11 @@
 .vscode/
 venv/
+/automation/core/__pycache__
+/automation/states/__pycache__
+/automation/utils/__pycache__
+app.log
+/capture/__pycache__
+/config/__pycache__
+/database/__pycache__
+game_data.db
+/web/__pycache__
